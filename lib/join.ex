@@ -512,8 +512,7 @@ defmodule AshSql.Join do
 
     tenant = (source_query && source_query.tenant) || context[:private][:tenant]
 
-    relationship.destination
-    |> Ash.Query.new()
+    (opts[:base_query] || Ash.Query.new(relationship.destination))
     |> Ash.Query.set_context(context)
     |> Ash.Query.set_context(%{data_layer: %{in_group?: !!opts[:in_group?]}})
     |> Ash.Query.set_context(%{

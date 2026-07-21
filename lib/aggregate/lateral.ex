@@ -355,6 +355,11 @@ defmodule AshSql.Aggregate.Lateral do
     end)
   end
 
+  defp aggregate_base_query([], aggregate_query), do: aggregate_query
+
+  # The aggregate query targets the end of the relationship path, not its first hop.
+  defp aggregate_base_query(_relationship_path, _aggregate_query), do: nil
+
   defp get_subquery(
          _resource,
          aggregates,
@@ -478,6 +483,7 @@ defmodule AshSql.Aggregate.Lateral do
     AshSql.Join.related_subquery(
       first_relationship,
       tmp_query,
+      base_query: aggregate_base_query(relationship_path, hd(aggregates).query),
       start_bindings_at: start_bindings_at,
       refs_at_path: root_data_path,
       skip_distinct_for_first_rel?: true,
