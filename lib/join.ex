@@ -501,6 +501,7 @@ defmodule AshSql.Join do
 
   @doc false
   def related_ash_query(relationship, query, opts \\ []) do
+    sort? = Keyword.get(opts, :sort?, false) && relationship_sort_required?(relationship)
     filter = Keyword.get(opts, :filter, nil)
     filter_subquery? = Keyword.get(opts, :filter_subquery?, false)
     parent_resources = Keyword.get(opts, :parent_stack, [relationship.source])
@@ -638,6 +639,14 @@ defmodule AshSql.Join do
       %{errors: errors} ->
         {:error, errors}
     end
+  end
+
+  defp relationship_sort_required?(relationship) do
+    # A plain relationship sort only controls presentation order. It affects query
+    # semantics when the relationship exposes a subset of its destination rows.
+    Map.get(relationship, :from_many?) ||
+      not is_nil(Map.get(relationship, :limit)) ||
+      not is_nil(Map.get(relationship, :offset))
   end
 
   @doc false
