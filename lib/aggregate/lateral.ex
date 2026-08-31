@@ -1517,7 +1517,7 @@ defmodule AshSql.Aggregate.Lateral do
        ) do
     query =
       from(row in query,
-        left_lateral_join: sub in ^subquery,
+        left_lateral_join: sub in subquery(subquery),
         as: ^query.__ash_bindings__.current,
         on: true
       )
