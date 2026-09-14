@@ -501,7 +501,6 @@ defmodule AshSql.Join do
 
   @doc false
   def related_ash_query(relationship, query, opts \\ []) do
-    sort? = Keyword.get(opts, :sort?, false) && relationship_sort_required?(relationship)
     filter = Keyword.get(opts, :filter, nil)
     filter_subquery? = Keyword.get(opts, :filter_subquery?, false)
     parent_resources = Keyword.get(opts, :parent_stack, [relationship.source])
@@ -563,7 +562,7 @@ defmodule AshSql.Join do
   end
 
   defp related_query(relationship, query, opts) do
-    sort? = Keyword.get(opts, :sort?, false)
+    sort? = Keyword.get(opts, :sort?, false) && relationship_sort_required?(relationship)
 
     related_ash_query(relationship, query, opts)
     |> then(fn query ->
@@ -683,18 +682,65 @@ defmodule AshSql.Join do
 
   @doc false
   def hydrate_refs(query, actor) do
-    query.filter
+    with {:ok, filter} <- hydrate_expression(query.filter, query, actor),
+         {:ok, combinations} <- hydrate_combinations(query, actor) do
+      %{query | filter: filter, combination_of: combinations}
+    else
+      {:error, error} -> Ash.Query.add_error(query, error)
+    end
+  end
+
+  defp hydrate_combinations(query, actor) do
+    Enum.reduce_while(query.combination_of, {:ok, []}, fn combination, {:ok, combinations} ->
+      with {:ok, filter} <- hydrate_expression(combination.filter, query, actor),
+           {:ok, calculations} <- hydrate_combination_calculations(combination, query, actor) do
+        {:cont,
+         {:ok, [%{combination | filter: filter, calculations: calculations} | combinations]}}
+      else
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+    |> case do
+      {:ok, combinations} -> {:ok, Enum.reverse(combinations)}
+      error -> error
+    end
+  end
+
+  defp hydrate_combination_calculations(combination, query, actor) do
+    Enum.reduce_while(combination.calculations, {:ok, %{}}, fn {name, calculation},
+                                                               {:ok, calculations} ->
+      expression =
+        Ash.Resource.Calculation.expression(
+          calculation.module,
+          calculation.opts,
+          calculation.context
+        )
+
+      case hydrate_expression(expression, query, actor) do
+        {:ok, expression} ->
+          calculation = %{
+            calculation
+            | module: Ash.Resource.Calculation.Expression,
+              opts: [expr: expression]
+          }
+
+          {:cont, {:ok, Map.put(calculations, name, calculation)}}
+
+        {:error, error} ->
+          {:halt, {:error, error}}
+      end
+    end)
+  end
+
+  defp hydrate_expression(expression, query, actor) do
+    expression
     |> Ash.Expr.fill_template(
       actor: actor,
       tenant: query.to_tenant,
-      args: %{},
+      args: query.arguments,
       context: query.context
     )
     |> Ash.Filter.hydrate_refs(%{resource: query.resource})
-    |> case do
-      {:ok, result} -> %{query | filter: result}
-      {:error, error} -> Ash.Query.add_error(query, error)
-    end
   end
 
   defp limit_from_many(

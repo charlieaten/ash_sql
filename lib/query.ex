@@ -611,6 +611,8 @@ defmodule AshSql.Query do
     else
       Enum.map(results, fn result ->
         result
+        |> Map.put_new(:calculations, %{})
+        |> Map.put_new(:aggregates, %{})
         |> remap_to_nested(:calculations, calculations_require_rewrite)
         |> remap_to_nested(:aggregates, aggregates_require_rewrite)
         |> remap(:calculations, calculation_names)

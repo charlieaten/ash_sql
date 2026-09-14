@@ -5,6 +5,8 @@
 defmodule AshSql.AggregateTest do
   use ExUnit.Case, async: true
 
+  import Ecto.Query
+
   require Ecto.Query
   require Ash.Query
 
@@ -126,6 +128,31 @@ defmodule AshSql.AggregateTest do
       resource(Member)
       resource(Ticket)
     end
+  end
+
+  test "related combination queries hydrate filters and calculation aggregates" do
+    import Ash.Expr
+    alias AshSql.Join
+
+    query =
+      Post
+      |> Ash.Query.combination_of([
+        Ash.Query.Combination.base(
+          filter: expr(id == ^actor(:id)),
+          calculations: %{score: calc(highest_score, type: :integer)}
+        )
+      ])
+
+    id = Ash.UUID.generate()
+    query = Join.hydrate_refs(query, %{id: id})
+    assert query.valid?
+    [combination] = query.combination_of
+    assert inspect(combination.filter) =~ id
+    calculation = combination.calculations.score
+    expression = calculation.module.expression(calculation.opts, calculation.context)
+
+    assert [%Ash.Query.Ref{resource: Post, attribute: %Ash.Query.Aggregate{kind: :max}}] =
+             Ash.Filter.list_refs(expression)
   end
 
   defp build(opts) do
@@ -403,5 +430,31 @@ defmodule AshSql.AggregateTest do
   defp normalize(aggregates, query \\ nil, root_data \\ nil) do
     query = query || AshSql.Bindings.default_bindings(%Ecto.Query{}, Post, __MODULE__)
     AshSql.Aggregate.Common.normalize(query, aggregates, Post, root_data)
+  end
+
+  test "manual relationship aggregate joins preserve the selected aggregate fields" do
+    manual_relationship_source =
+      from(comment in "comments",
+        select: %{id: comment.id}
+      )
+
+    aggregate_query =
+      from(comment in subquery(manual_relationship_source),
+        select: %{aggregate_2: count()}
+      )
+
+    query =
+      from(post in "posts")
+      |> AshSql.Aggregate.join_manual_relationship_aggregate_subquery(
+        aggregate_query,
+        :aggregate
+      )
+      |> select([_post, aggregate], field(aggregate, :aggregate_2))
+
+    {planned_query, _params, _cache_key} =
+      Ecto.Query.Planner.plan(query, :all, Ecto.Adapters.Postgres)
+
+    assert {%Ecto.Query{}, _select} =
+             Ecto.Query.Planner.normalize(planned_query, :all, Ecto.Adapters.Postgres, 0)
   end
 end

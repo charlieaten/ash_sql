@@ -487,6 +487,7 @@ defmodule AshSql.Aggregate.Lateral do
       start_bindings_at: start_bindings_at,
       refs_at_path: root_data_path,
       skip_distinct_for_first_rel?: true,
+      return_subquery?: true,
       sort?: limited?,
       on_subquery: fn subquery ->
         base_binding = subquery.__ash_bindings__.root_binding
@@ -1516,10 +1517,10 @@ defmodule AshSql.Aggregate.Lateral do
          root_data_path
        ) do
     query =
-      from(row in query,
-        left_lateral_join: sub in subquery(subquery),
-        as: ^query.__ash_bindings__.current,
-        on: true
+      AshSql.Aggregate.join_manual_relationship_aggregate_subquery(
+        query,
+        subquery,
+        query.__ash_bindings__.current
       )
 
     AshSql.Bindings.add_binding(
