@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: MIT
 
 defmodule AshSql.Aggregate do
+  import Ecto.Query, only: [from: 2]
+
   @moduledoc false
 
   def add_aggregates(
@@ -97,6 +99,15 @@ defmodule AshSql.Aggregate do
           end
       end
     end
+  end
+
+  @doc false
+  def join_manual_relationship_aggregate_subquery(query, aggregate_query, as_binding) do
+    from(row in query,
+      left_lateral_join: sub in subquery(aggregate_query),
+      as: ^as_binding,
+      on: true
+    )
   end
 
   def wrap_in_subquery_for_aggregates(query) do

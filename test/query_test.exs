@@ -19,6 +19,23 @@ defmodule AshSql.QueryTest do
     def manual_relationship_subquery_function, do: :ash_postgres_subquery
   end
 
+  test "remaps flattened calculation and aggregate fields on combination result maps" do
+    query = %{
+      __ash_bindings__: %{
+        calculation_names: %{},
+        aggregate_names: %{}
+      }
+    }
+
+    assert [%{calculations: %{score: 5}, aggregates: %{total: 2}}] =
+             AshSql.Query.remap_mapped_fields(
+               [%{flat_score: 5, flat_total: 2}],
+               query,
+               %{flat_score: :score},
+               %{flat_total: :total}
+             )
+  end
+
   defmodule RecordSharedContext do
     use Ash.Resource.Preparation
 
