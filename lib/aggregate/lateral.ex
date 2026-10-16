@@ -483,7 +483,7 @@ defmodule AshSql.Aggregate.Lateral do
     AshSql.Join.related_subquery(
       first_relationship,
       tmp_query,
-      base_query: aggregate_base_query(relationship_path, hd(aggregates).query),
+      source_query: aggregate_base_query(relationship_path, hd(aggregates).query),
       start_bindings_at: start_bindings_at,
       refs_at_path: root_data_path,
       skip_distinct_for_first_rel?: true,
