@@ -26,6 +26,18 @@ defmodule AshSql.JoinTest do
       read :bypass do
         multitenancy(:bypass)
       end
+
+      read :at_depth do
+        argument(:depth, :integer, allow_nil?: false)
+      end
+    end
+
+    relationships do
+      has_many :related, __MODULE__ do
+        source_attribute(:id)
+        destination_attribute(:id)
+        read_action(:at_depth)
+      end
     end
   end
 
@@ -35,6 +47,16 @@ defmodule AshSql.JoinTest do
     resources do
       resource(Tenanted)
     end
+  end
+
+  test "related aggregate queries retain source read action arguments" do
+    source = Ash.Query.for_read(Tenanted, :at_depth, %{depth: 2}, tenant: "acme")
+    relationship = Ash.Resource.Info.relationship(Tenanted, :related)
+
+    related = Join.related_ash_query(relationship, query(), source_query: source)
+
+    assert related.valid?
+    assert related.arguments.depth == 2
   end
 
   describe "handle_attribute_multitenancy/3" do
