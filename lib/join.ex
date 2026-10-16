@@ -550,7 +550,10 @@ defmodule AshSql.Join do
         Ash.Query.for_read(
           query,
           read_action.name,
-          Map.get(relationship, :read_action_arguments, %{}),
+          Map.merge(
+            (source_query && source_query.arguments) || %{},
+            Map.get(relationship, :read_action_arguments, %{})
+          ),
           actor: context[:private][:actor],
           tenant: tenant
         )
